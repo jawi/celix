@@ -27,6 +27,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <signal.h>
+#include <libgen.h>
 #include <apr_general.h>
 #include <apr_strings.h>
 
@@ -37,6 +38,8 @@
 #include "linked_list_iterator.h"
 #include "celix_log.h"
 
+#define DEFAULT_CONFIG_FILE "config.properties"
+
 void launcher_shutdown(int signal);
 
 int running = 0;
@@ -44,7 +47,7 @@ int running = 0;
 struct framework * framework;
 apr_pool_t *memoryPool;
 
-int main(void) {
+int main(int argc, char *argv[]) {
 	// Set signal handler
 	apr_status_t rv = APR_SUCCESS;
 	apr_status_t s = APR_SUCCESS;
@@ -65,7 +68,31 @@ int main(void) {
         return CELIX_START_ERROR;
     }
 
-    config = properties_load("config.properties");
+	// Perform some minimal command-line option parsing...
+	char* opt = NULL;
+	if (argc > 1) {
+		opt = argv[1];
+	}
+
+	char* config_file = NULL;
+
+	if (strcmp("-h", opt) == 0 || strcmp("-help", opt) == 0) {
+		printf("Usage:\n  %s [path/to/config.properties]\n\n", basename(argv[0]));
+		return 0;
+	} else if (opt) {
+		config_file = opt;
+	} else {
+		config_file = DEFAULT_CONFIG_FILE;
+	}
+
+    config = properties_load(config_file);
+	// Make sure we've read it and that nothing went wrong with the file access...
+	if (errno) {
+		printf("Error: invalid or non-existing configuration file: \"%s\"!\n", config_file);
+		printf("Usage:\n  %s [path/to/config.properties]\n\n", basename(argv[0]));
+		return CELIX_START_ERROR;
+	}
+
     autoStart = properties_get(config, "cosgi.auto.start.1");
     framework = NULL;
     celix_status_t status = CELIX_SUCCESS;
